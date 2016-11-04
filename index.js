@@ -84,7 +84,7 @@ class mochaPlugin {
   }
 
   runTests() {
-    const _this = this;
+    const that = this;
     const funcName = this.options.f || this.options.function || [];
     const testFileMap = {};
     const mocha = new Mocha({ timeout: 6000 });
@@ -97,17 +97,17 @@ class mochaPlugin {
       region
     })
       .then((inited) => {
-        _this.serverless.environment = inited.environment;
+        that.serverless.environment = inited.environment;
 
-        _this.getFunctions(funcName)
+        that.getFunctions(funcName)
           .then(utils.getTestFiles)
           .then((funcs) => {
             const funcNames = Object.keys(funcs);
             if (funcNames.length === 0) {
-              return _this.serverless.cli.log('No tests to run');
+              return that.serverless.cli.log('No tests to run');
             }
-            funcNames.forEach(function (func) {
-              _this.setEnvVars(func, {
+            funcNames.forEach((func) => {
+              that.setEnvVars(func, {
                 stage,
                 region
               });
@@ -116,12 +116,12 @@ class mochaPlugin {
 
               mocha.addFile(funcs[func].mochaPlugin.testPath);
             });
-            const reporter = _this.options.reporter;
+            const reporter = that.options.reporter;
 
             if (reporter !== undefined) {
               const reporterOptions = {};
-              if (_this.options['reporter-options'] !== undefined) {
-                _this.options['reporter-options'].split(',').forEach((opt) => {
+              if (that.options['reporter-options'] !== undefined) {
+                that.options['reporter-options'].split(',').forEach((opt) => {
                   const L = opt.split('=');
                   if (L.length > 2 || L.length === 0) {
                     throw new Error(`invalid reporter option '${opt}'`);
@@ -132,47 +132,45 @@ class mochaPlugin {
                   }
                 });
               }
-              mocha.reporter(reporter, reporterOptions)
+              mocha.reporter(reporter, reporterOptions);
             }
 
-            mocha.run((failures) => {
+            return mocha.run((failures) => {
               process.on('exit', () => {
                 process.exit(failures);  // exit with non-zero status if there were failures
               });
             })
               .on('suite', (suite) => {
-                const funcName = utils.funcNameFromPath(suite.file);
-                const func = testFileMap[funcName];
+                const f = utils.funcNameFromPath(suite.file);
+                const func = testFileMap[f];
 
                 if (func) {
-                  _this.setEnvVars(func, {
+                  that.setEnvVars(func, {
                     stage,
                     region
                   });
                 }
               })
-              .on('end', (e) => {
-
+              .on('end', () => {
               });
-          }, error => _this.serverless.cli.log(error));
+          }, error => that.serverless.cli.log(error));
       });
   }
 
   createTest() {
     const funcName = this.options.f || this.options.function;
-    const _this = this;
+    const that = this;
 
     utils.createTestFolder().then((testFolder) => {
       const testFilePath = utils.getTestFilePath(funcName);
-      const servicePath = _this.serverless.config.servicePath;
-      const func = _this.serverless.service.functions[funcName];
+      const func = that.serverless.service.functions[funcName];
       const handlerParts = func.handler.split('.');
       const funcPath = (`${handlerParts[0]}.js`).replace(/\\/g, '/');
       const funcCall = handlerParts[1];
 
       fs.exists(testFilePath, (exists) => {
         if (exists) {
-          _this.serverless.cli.log(`Test file ${testFilePath} already exists`)
+          that.serverless.cli.log(`Test file ${testFilePath} already exists`)
           return (new Error(`File ${testFilePath} already exists`));
         }
 
@@ -191,10 +189,10 @@ class mochaPlugin {
 
           fs.writeFile(testFilePath, content, (err) => {
             if (err) {
-              _this.serverless.cli.log(`Creating file ${testFilePath} failed: ${err}`);
+              that.serverless.cli.log(`Creating file ${testFilePath} failed: ${err}`);
               return new Error(`Creating file ${testFilePath} failed: ${err}`);
             }
-            return _this.serverless.cli.log(`serverless-mocha-plugin: created ${testFilePath}`);
+            return that.serverless.cli.log(`serverless-mocha-plugin: created ${testFilePath}`);
           });
         });
       });
@@ -204,24 +202,24 @@ class mochaPlugin {
   // Helper functions
 
   getFunctions(funcNames) {
-    const _this = this;
+    const that = this;
 
     return new Promise((resolve, reject) => {
       const funcObjs = {};
-      const allFuncs = _this.serverless.service.functions;
+      const allFunctions = that.serverless.service.functions;
       const functionNames = typeof (funcNames) === 'string' ? [funcNames] : funcNames;
 
-      if (funcNames.length === 0) {
-        return resolve(allFuncs);
+      if (functionNames.length === 0) {
+        return resolve(allFunctions);
       }
 
       let func;
-      functionNames.forEach((funcName, idx) => {
-        func = allFuncs[funcName];
+      functionNames.forEach((funcName) => {
+        func = allFunctions[funcName];
         if (func) {
           funcObjs[funcName] = func;
         } else {
-          _this.serverless.cli.log(`Warning: Could not find function '${funcName}'.`);
+          that.serverless.cli.log(`Warning: Could not find function '${funcName}'.`);
         }
       });
 
@@ -236,7 +234,9 @@ class mochaPlugin {
       if (options.stage) {
         utils.setEnv(this.serverless.environment.stages[options.stage].vars);
         if (options.region) {
-          utils.setEnv(this.serverless.environment.stages[options.stage].regions[options.region].vars);
+          utils.setEnv(
+            this.serverless.environment.stages[options.stage].regions[options.region].vars
+          );
         }
       }
     }
